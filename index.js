@@ -6,8 +6,8 @@ var ObjectID = require('mongodb').ObjectID;
 var imgur = require('imgur');
 var wait=require('wait.for-es6');
 var host = "http://thichtruyentranh.com";
-var urlStory = "http://thichtruyentranh.com/tinh-than-bien/813.html";
-var categoryId = { $oid: "58f45957dcaec3000493ef78"};
+var urlStory = "http://thichtruyentranh.com/doraemon/1550.html";
+var categoryId = { $oid: "58fc7577e593de00042550f9"};
 var lstchap = [];
 var category = {};
 imgur.setClientId('bfa81e029d03ca1');
@@ -18,7 +18,10 @@ category._id = {
 };
 category.stories = [];
 
-
+String.prototype.replaceAll = function(search, replacement) {
+    var target = this;
+    return target.replace(new RegExp(search, 'g'), replacement);
+};
 
 
 function getOptions(url){
@@ -30,12 +33,9 @@ function getOptions(url){
   };
 }
 var DoneFunction = function(result){
-    result = result.map(rs => {
-        rs.date = {
-            $date: new Date(rs.date)
-        };
-        return rs;
-    });
+    category.stories = result.map(function(rs){
+        return rs._id;
+    })
     var filename = 'stories.json';
     fs.writeFile(filename, JSON.stringify(result));
     console.log('Stories data saved in: ' + __dirname + '/' + filename);
@@ -65,7 +65,13 @@ function GetRequestPage(url){
     if(response.statusCode === 200) {
       // Parse the document body
       let $ = cheerio.load(body, { decodeEntities: false });
-      let paging = $($('.paging li a')[$('.paging li a').length - 1]).html();
+      let paging = 0;
+      if ($('.paging li a').length == 0)
+      {
+          paging = 1;
+      }
+      else paging = +$($('.paging li a')[$('.paging li a').length - 1]).attr('href').split('.')[1];
+      
       let pages = [];
       for (let t = 1; t <= paging; t++)
       {
@@ -77,12 +83,26 @@ function GetRequestPage(url){
               let pageLink = url.split('.html')[0] + `/trang.${page}.html`;
               request.get(getOptions(pageLink), function(error, response, body) {
                     let $ = cheerio.load(body, { decodeEntities: false });
-                    $($('.ul_listchap')[1]).find('li').each(function(i, element){
+                    if ($('.paging li a').length == 0)
+                    {
+                         $($('.ul_listchap')[0]).find('li').each(function(i, element){
                         let link = host + $(element).find('a').attr('href');
                         let name = $(element).find('a').html();
                         let chap = + $(element).find('span').html();
                         lstStories.push({link: link, name: name, chap: chap});
-                    });
+                        });
+                       
+                    }
+                    else
+                    {
+                        $($('.ul_listchap')[1]).find('li').each(function(i, element){
+                        let link = host + $(element).find('a').attr('href');
+                        let name = $(element).find('a').html();
+                        let chap = + $(element).find('span').html();
+                        lstStories.push({link: link, name: name, chap: chap});
+                        });
+                    }
+                   
 
                     async.mapSeries(lstStories, function(item, callback){
                         request(getOptions(item.link), function(error, response, body){
@@ -93,14 +113,13 @@ function GetRequestPage(url){
                                     object._id = {
                                     $oid: new ObjectID().toString('hex')
                                     };
-                                    category.stories.push(object._id);
                                   
                                     object.text_pre = '';
                                     object.name = item.name
                                     object.part = item.chap;
                                     var date = $('.content-date').find('span').html().split(' ')[1].split('/');
                                     object.date = {
-                                        $date: new Date(2017, date[1], date[0])
+                                        $date: new Date(2017, date[1] - 1, date[0])
                                     };
                                     
                                     object.img_main = [];
@@ -118,12 +137,17 @@ function GetRequestPage(url){
                                     var match;
                                     while ((match = re.exec(findAndClean)) != null){
                                         var input = match[0];
+                                        if (input.indexOf('.jpg') < 0)
+                                        {
+                                            input += '.jpg';
+                                        }
+                                        input.replaceAll('%20', '');
                                        arr.push(input);
                                     }
 
                                     var tasks =  arr.map((element, i) => function(callback){
                                        
-                                        request.get("http://uploads.im/api?upload=" + element + '.jpg', {headers: {
+                                        request.get("http://uploads.im/api?upload=" + element, {headers: {
                                         'Content-Type': 'application/json'
                                     }}, function(error, response, body){
                                             if (JSON.parse(body).status_code == 200)
@@ -139,14 +163,14 @@ function GetRequestPage(url){
                                         })
                                     
                                     })
-                                    async.parallelLimit(tasks, 4, function(err, result){
+                                    async.parallelLimit(tasks, 10, function(err, result){
                                         result.sort((a, b) => a > b).forEach(function(e){
                                         if (e.index == -1) 
                                         {
 
                                         }
                                         else imgs.img_main.push({url: e.link});
-                                        imgs.img_pre = "http://res.cloudinary.com/dxnapa5zf/image/upload/v1492408663/lcappgtzlctmadkoapyx.jpg";
+                                        imgs.img_pre = "http://sk.uploads.im/RA27P.jpg";
                                         })
                                         callback(null, imgs);
                                     });
@@ -164,7 +188,7 @@ function GetRequestPage(url){
                         });
                         
                     }, function(err, results){
-                       callback(results);
+                       callback(null, results);
                     });
 
               });
@@ -176,7 +200,7 @@ function GetRequestPage(url){
             result.forEach(function(stories){
                 lstResult = lstResult.concat(stories);
             })
-            return lstResult;
+            DoneFunction(lstResult);
       })
       
       
@@ -185,14 +209,3 @@ function GetRequestPage(url){
 }
 
 GetRequestPage(urlStory);
-/*
-var text = $($('script')[5]).text();
-    var findAndClean = findTextAndReturnRemainder(text,"var imgArray = ");
-    var re = /\http.*?\jpg/ig
-    var match;
-    while ((match = re.exec(findAndClean)) != null){
-    var input = match[0],
-        re1 = /value="(.*?)"/ig;
-        console.log(input);
-    }
-    */
