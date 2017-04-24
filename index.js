@@ -2,12 +2,14 @@ var request = require('request');
 var cheerio = require('cheerio');
 var async =  require('async');
 const fs = require('fs');
+const Picasa = require('picasa')
 var ObjectID = require('mongodb').ObjectID;
 var imgur = require('imgur');
 var wait=require('wait.for-es6');
+const picasa = new Picasa()
 var host = "http://thichtruyentranh.com";
-var urlStory = "http://thichtruyentranh.com/doraemon/1550.html";
-var categoryId = { $oid: "58fc7577e593de00042550f9"};
+var urlStory = "http://thichtruyentranh.com/huong-mat-tram-tram/6146.html";
+var categoryId = { $oid: "58fc6752e593de00042550f8"};
 var lstchap = [];
 var category = {};
 imgur.setClientId('bfa81e029d03ca1');
@@ -29,9 +31,34 @@ function getOptions(url){
           url: url,
           headers: {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1'
-          }
+          },
+          proxy: 'http://proxy.fpt.vn:80'
   };
 }
+
+function getOptionsImage(url)
+{
+    return {
+        url: url,
+        method: 'GET',
+        proxy: 'http://proxy.fpt.vn:80',
+        encoding: null
+    };
+}
+function getPhotoData(binaryData){
+    return  {
+        title       : 'A title',
+        summary     : 'Summary or description',
+        contentType : 'image/jpeg',             // image/bmp, image/gif, image/png 
+        binary      : binaryData
+    };
+}
+var accessToken = "ya29.Gls2BACCFpCbEVuU7qsskL0uPMDtQH3AHDLQwhoj6uBs1sG_iNueIxCQsqxedvz-KUquBaeXHPClYcyHA-S-zksIc_TnJGMiZUsg-a8N1R_8Nl5kqeudfNEBurXa";
+
+
+
+
+
 var DoneFunction = function(result){
     category.stories = result.map(function(rs){
         return rs._id;
@@ -146,31 +173,25 @@ function GetRequestPage(url){
                                     }
 
                                     var tasks =  arr.map((element, i) => function(callback){
-                                       
-                                        request.get("http://uploads.im/api?upload=" + element, {headers: {
-                                        'Content-Type': 'application/json'
-                                    }}, function(error, response, body){
-                                            if (JSON.parse(body).status_code == 200)
-                                            {
-                                                let link = JSON.parse(body).data.img_url;
-                                                callback(null, {index: i, link: link});
-                                            }
-                                            else
-                                            {
-                                                callback(null, {index: -1, link: ''});
-                                            }
-                                            
-                                        })
+                                        request.get(getOptionsImage(element), function(err, response, body){
+                                            picasa.postPhoto(accessToken, '6412227004635116865', getPhotoData(body), (error, photo) => {
+                                               
+                                                callback(null, {index: i, link: photo.content.src});
+                                            })
+                                        });
+                                        
+
                                     
                                     })
-                                    async.parallelLimit(tasks, 10, function(err, result){
-                                        result.sort((a, b) => a > b).forEach(function(e){
+                                    async.parallel(tasks, function(err, result){
+                                        result.sort(function(a, b){return a.index-b.index});
+                                        result.forEach(function(e){
                                         if (e.index == -1) 
                                         {
 
                                         }
                                         else imgs.img_main.push({url: e.link});
-                                        imgs.img_pre = "http://sk.uploads.im/RA27P.jpg";
+                                        imgs.img_pre = "https://lh3.googleusercontent.com/UV6mDfSMCFrGlfRYYOqJ6EnXh02eznWD09jXK63PbaHmZ6SpdlgySlOyet_QP2QTN54h-bJpF_jmilU7sQhb6-b1GHWe5nzSiVJXgp72GCdGHG7rsZEwet035N8Jm6GYOUEN3LCZhy3MGNJ-NnTXBLbLSr8dHnSb9i7YerKKX-bvi-HxpzQyLgB_mIj8_oYU3HthOKVVi0-BxIm5EcHH6E5lzxWQ5LmgYrgJgk4Cl231iTMoQUBYEc6gjQOBnSDOHeFJmWXo1hGt6Y2ogkyGIw_9SaApU8bC2H6C3Rlkt4s4K3bgGz94ZnIQwLn8rGWOcwuztn8tQiVpMzj75UVDM1QxWuf_HunWfPgehcYF-O_QPVrlqR3DRpTtR0tmpTHGHQWYa730AH-zBOI1IjcsnH_aQQZ_JiNzDwD-ML3MP4QWf61fOR42idU1KSgK9N46Vs-_dXOFylG_Vj6QvYqUrZyxIbirZsHVlLg68-770VBo7qJJGXurKMW4Rtg4afz2hjKcPRHm5n8PqGSEveeR2dgkggN5sXA5LBj9P43VxoULlH2djWjjpHHOpyf2EcyAfdgUGtkXJ3cpMkRMiccC8uHcGBEpkLEk_Vki3tn1CHikE5s4dN-2=w520-h302-no";
                                         })
                                         callback(null, imgs);
                                     });
