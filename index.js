@@ -1,17 +1,18 @@
-var request = require('request');
-var cheerio = require('cheerio');
-var async =  require('async');
+let request = require('request');
+let cheerio = require('cheerio');
+let async =  require('async');
 const fs = require('fs');
 const Picasa = require('picasa')
-var ObjectID = require('mongodb').ObjectID;
-var imgur = require('imgur');
-var wait=require('wait.for-es6');
+let ObjectID = require('mongodb').ObjectID;
+let imgur = require('imgur');
+let wait=require('wait.for-es6');
 const picasa = new Picasa()
-var host = "http://thichtruyentranh.com";
-var urlStory = "http://thichtruyentranh.com/huong-mat-tram-tram/6146.html";
-var categoryId = { $oid: "58fc6752e593de00042550f8"};
-var lstchap = [];
-var category = {};
+let host = "http://thichtruyentranh.com";
+let urlStory = "http://thichtruyentranh.com/mat-dao-tieu-kieu-the/8854.html";
+let categoryId = { $oid: "58fc7577e593de00042550f9"};
+let lstchap = [];
+let category = {};
+let lstError = [];
 imgur.setClientId('bfa81e029d03ca1');
 imgAlbum = "KBzEd";
 
@@ -21,7 +22,7 @@ category._id = {
 category.stories = [];
 
 String.prototype.replaceAll = function(search, replacement) {
-    var target = this;
+    let target = this;
     return target.replace(new RegExp(search, 'g'), replacement);
 };
 
@@ -30,7 +31,8 @@ function getOptions(url){
   return  {
           url: url,
           headers: {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1'
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
+            'Content-Type':'text/html'
           },
           proxy: 'http://proxy.fpt.vn:80'
   };
@@ -42,7 +44,10 @@ function getOptionsImage(url)
         url: url,
         method: 'GET',
         proxy: 'http://proxy.fpt.vn:80',
-        encoding: null
+        encoding: null,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
+    },
     };
 }
 function getPhotoData(binaryData){
@@ -53,36 +58,43 @@ function getPhotoData(binaryData){
         binary      : binaryData
     };
 }
-var accessToken = "ya29.Gls2BACCFpCbEVuU7qsskL0uPMDtQH3AHDLQwhoj6uBs1sG_iNueIxCQsqxedvz-KUquBaeXHPClYcyHA-S-zksIc_TnJGMiZUsg-a8N1R_8Nl5kqeudfNEBurXa";
+let accessToken = "ya29.Gls4BB02ndVB1IQLtAOSAqjiZZeXSVbJGobJui113iztuNxAbSV7QulDrJ8iVUBvxdCwebSidO3nczIoQjD-kfFhznlb7unPbS94nKuJ3ofp2TaAI9bRj5KgETYY";
 
 
 
+setInterval(function(){
+    fs.readFile(__dirname + '\\' + 'token.txt', 'utf8', function(err, token) {
+        accessToken = token;
+    });
+}, 600000);
 
 
-var DoneFunction = function(result){
+
+let DoneFunction = function(result){
     category.stories = result.map(function(rs){
         return rs._id;
     })
-    var filename = 'stories.json';
+    let filename = 'stories.json';
     fs.writeFile(filename, JSON.stringify(result));
     console.log('Stories data saved in: ' + __dirname + '/' + filename);
     console.log('Total chap: ' + result.length);
-    var filename1 = 'category.json';
+    let filename1 = 'category.json';
     fs.writeFile(filename1, JSON.stringify(category));
     console.log('Stories metadata save in: ' + __dirname + '/' + filename1)
+    fs.writeFile("errorlog.json", JSON.stringify(lstError));
     
 };
 
 
 
-function findTextAndReturnRemainder(target, variable){
-    var chopFront = target.substring(target.search(variable)+variable.length,target.length);
-    var result = chopFront.substring(0,chopFront.search(";"));
+function findTextAndReturnRemainder(target, letiable){
+    let chopFront = target.substring(target.search(letiable)+letiable.length,target.length);
+    let result = chopFront.substring(0,chopFront.search(";"));
     return result;
 }
 
 function GetRequestPage(url){
-    request.get(getOptions(url), function(error, response, body) {
+    let req = request.get(getOptions(url), function(error, response, body) {
    
     if(error) {
       console.log("Error: " + error);
@@ -108,7 +120,7 @@ function GetRequestPage(url){
           return function(callback){
               let lstStories = [];
               let pageLink = url.split('.html')[0] + `/trang.${page}.html`;
-              request.get(getOptions(pageLink), function(error, response, body) {
+              let req = request.get(getOptions(pageLink), function(error, response, body) {
                     let $ = cheerio.load(body, { decodeEntities: false });
                     if ($('.paging li a').length == 0)
                     {
@@ -132,7 +144,13 @@ function GetRequestPage(url){
                    
 
                     async.mapSeries(lstStories, function(item, callback){
-                        request(getOptions(item.link), function(error, response, body){
+                        let req = request(getOptions(item.link), function(error, response, body){
+                            if (error)
+                            {
+                                callback(error, null);
+                            }
+                            else
+                            {
                             let $ = cheerio.load(body, { decodeEntities: false });
                             async.parallel({
                                 getData: function(callback) {
@@ -144,9 +162,9 @@ function GetRequestPage(url){
                                     object.text_pre = '';
                                     object.name = item.name
                                     object.part = item.chap;
-                                    var date = $('.content-date').find('span').html().split(' ')[1].split('/');
+                                   
                                     object.date = {
-                                        $date: new Date(2017, date[1] - 1, date[0])
+                                        $date: new Date()
                                     };
                                     
                                     object.img_main = [];
@@ -155,35 +173,97 @@ function GetRequestPage(url){
                                     callback(null,object);
                                 },
                                 uploadImage: function(callback){
-                                    var imgs = {};
+                                    let imgs = {};
                                     imgs.img_main = [];                       
-                                    var arr = [];
-                                    var text = $($('script')[5]).text();
-                                    var findAndClean = findTextAndReturnRemainder(text,"var imgArray = ");
-                                    var re = /\http.*?\jpg/ig
-                                    var match;
+                                    let arr = [];
+                                    let text = $($('script')[5]).text();
+                                    let findAndClean = findTextAndReturnRemainder(text,"let imgArray = ");
+                                    let re = /\http.*?\" alt="/ig
+                                    let match;
                                     while ((match = re.exec(findAndClean)) != null){
-                                        var input = match[0];
-                                        if (input.indexOf('.jpg') < 0)
-                                        {
-                                            input += '.jpg';
-                                        }
+                                        let input = match[0];
+                                        input = input.substring(0, input.length - 7);
                                         input.replaceAll('%20', '');
                                        arr.push(input);
                                     }
 
-                                    var tasks =  arr.map((element, i) => function(callback){
-                                        request.get(getOptionsImage(element), function(err, response, body){
+                                    let tasks =  arr.map((element, i) => function(callback){
+                                        let req = request.get(getOptionsImage(element), function(err, response, body){
+											let wascallback = false;
                                             picasa.postPhoto(accessToken, '6412227004635116865', getPhotoData(body), (error, photo) => {
-                                               
+											if (error || !photo)
+											{
+                                                if (error.statusCode == 400)
+                                                {
+                                                    callback(null, {index: -1, link: ''});
+                                                    wascallback = true;
+                                                }
+                                                else
+                                                {
+                                                     lstError.push(error);
+                                                        let numInt = setInterval(function(){
+                                                            if (wascallback == true)
+                                                            {
+                                                                clearInterval(numInt);
+
+                                                            }
+                                                            picasa.postPhoto(accessToken, '6412227004635116865', getPhotoData(body), (error, photo) => {
+                                                                if (error)
+                                                                {
+                                                                    lstError.push(error);
+                                                                    if (error.statusCode == 400)
+                                                                    {
+                                                                        
+                                                                         clearInterval(numInt);
+                                                                         if (wascallback == false)
+                                                                         {
+                                                                              callback(null, {index: -1, link: ''});
+                                                                              wascallback = true;
+                                                                         }
+                                                                    }
+                                                                    else
+                                                                    {
+
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    clearInterval(numInt);
+                                                                    if (wascallback == false)
+                                                                    {
+                                                                       
+                                                                        callback(null, {index: i, link: photo.content.src});
+                                                                        wascallback = true;
+                                                                    }
+                                                                }
+                                                            });
+                                                        }, 1000);
+                                                }
+                                                
+											}
+											
+                                            else
+                                            {
+                                                wascallback = true;
                                                 callback(null, {index: i, link: photo.content.src});
+                                                
+                                            } 
+                                               
+                                                
                                             })
+                                             
                                         });
+                                       
                                         
 
                                     
                                     })
                                     async.parallel(tasks, function(err, result){
+										if (err)
+                                        {
+                                            callback(err, null);
+                                            lstError.push(err);
+                                        }
                                         result.sort(function(a, b){return a.index-b.index});
                                         result.forEach(function(e){
                                         if (e.index == -1) 
@@ -191,42 +271,69 @@ function GetRequestPage(url){
 
                                         }
                                         else imgs.img_main.push({url: e.link});
-                                        imgs.img_pre = "https://lh3.googleusercontent.com/UV6mDfSMCFrGlfRYYOqJ6EnXh02eznWD09jXK63PbaHmZ6SpdlgySlOyet_QP2QTN54h-bJpF_jmilU7sQhb6-b1GHWe5nzSiVJXgp72GCdGHG7rsZEwet035N8Jm6GYOUEN3LCZhy3MGNJ-NnTXBLbLSr8dHnSb9i7YerKKX-bvi-HxpzQyLgB_mIj8_oYU3HthOKVVi0-BxIm5EcHH6E5lzxWQ5LmgYrgJgk4Cl231iTMoQUBYEc6gjQOBnSDOHeFJmWXo1hGt6Y2ogkyGIw_9SaApU8bC2H6C3Rlkt4s4K3bgGz94ZnIQwLn8rGWOcwuztn8tQiVpMzj75UVDM1QxWuf_HunWfPgehcYF-O_QPVrlqR3DRpTtR0tmpTHGHQWYa730AH-zBOI1IjcsnH_aQQZ_JiNzDwD-ML3MP4QWf61fOR42idU1KSgK9N46Vs-_dXOFylG_Vj6QvYqUrZyxIbirZsHVlLg68-770VBo7qJJGXurKMW4Rtg4afz2hjKcPRHm5n8PqGSEveeR2dgkggN5sXA5LBj9P43VxoULlH2djWjjpHHOpyf2EcyAfdgUGtkXJ3cpMkRMiccC8uHcGBEpkLEk_Vki3tn1CHikE5s4dN-2=w520-h302-no";
+                                       
                                         })
+                                        imgs.img_pre = "https://lh3.googleusercontent.com/-uXOrh4rs2sE/WP2Tcj5poyI/AAAAAAAAB4Q/cKyEthlH9mcGjX5A_v8O2smQh8hqDlGMwCHM/RA27P.jpg";
                                         callback(null, imgs);
                                     });
                                 }
                             }, function(err, results) {
-                                // results is now equals to: {one: 1, two: 2}
-                                let story = results.getData;
-                                let imgs = results.uploadImage;
-                                story.img_pre = imgs.img_pre;
-                                story.img_main = imgs.img_main;
-                                console.log(story);
-                                callback(null, story);
+                                if (err)
+                                {
+                                    lstError.push(err);
+                                    callback(err, null);
+                                }
+                                else
+                                {
+                                    let story = results.getData;
+                                    let imgs = results.uploadImage;
+                                    story.img_pre = imgs.img_pre;
+                                    story.img_main = imgs.img_main;
+                                    console.log(story);
+                                    callback(null, story);
+                                }
+                                
                             });
-                
+                             
+                            }
+                            
+ 
                         });
+                      
                         
                     }, function(err, results){
-                       callback(null, results);
+                        if (err)
+                        {
+                                    lstError.push(err);
+                                    callback(err, null);
+                        }
+                        else callback(null, results);
                     });
-
+                    
               });
+             
           }
       })
 
-      async.parallel(taskschap, function(err, result){
-            var lstResult = [];
-            result.forEach(function(stories){
-                lstResult = lstResult.concat(stories);
-            })
-            DoneFunction(lstResult);
+      async.parallelLimit(taskschap, 5, function(err, result){
+          if (err) console.log(err)
+          else
+          {
+              let lstResult = [];
+                result.forEach(function(stories){
+                    lstResult = lstResult.concat(stories);
+                })
+
+                DoneFunction(lstResult);
+          }
+            
       })
       
       
     }
+    
   });
+  
 }
 
 GetRequestPage(urlStory);

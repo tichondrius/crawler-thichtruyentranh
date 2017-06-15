@@ -1,0 +1,41 @@
+  <div class="col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                            <div class="portlet light portlet-fit ">
+                                <div class="portlet-title">
+                                    <div class="caption">
+                                        <i class=" icon-layers font-green"></i>
+                                        <span style="cursor: pointer" [routerLink] = "['/stories', story._id]" class="caption-subject font-green bold uppercase">{{story.name |truncate:true:17}} #{{story.part}}</span>
+                                        <div class="caption-desc font-grey-cascade">
+                                                            <div>
+                                                            <span class="tag label label-success pointer-hover" [routerLink] ="['/categories', story.cat._id]"><i class="fa fa-book" aria-hidden="true"></i> {{story.cat.name|truncate:true:15}}</span>
+                                                            <span class="tag label label-info">{{story.date | dateShort}}</span>
+                                                            </div>
+                                                             {{story.text_pre | truncate:true:35}}</div>
+                                                            
+                                    </div>
+                                </div>
+                                <div class="portlet-body">
+                                    <div class="mt-element-overlay">
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="mt-overlay-2">
+                                                    <img class="story-box-image" [routerLink] = "['/stories', story._id]" src="{{story.img_pre|urlImg }}">
+                                                    <div class="mt-overlay">
+                                                        <a [routerLink] = "['/stories', story._id]" class="mt-info btn default btn-outline" href="#">ĐỌC NGAY</a>
+                                                    </div>
+                                                </div>
+                                               
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                 <div class="input-group">
+                                                    <div class="input-group-btn"> 
+                                                        <button style="display: none;"></button>
+                                                        <button  class="btn btn-default"><i class="fa fa-heart" style="color:red; font-size: 15px;"></i><span class="like-feed-@feed.ID badge"></span></button>
+                                                        <button  class="btn btn-default"><i class="fa fa-frown-o" style="color:red; font-size: 15px;"></i><span class="sad-feed-@feed.ID badge"></span></button>
+                                                        <button  class="btn btn-default"><i class="fa fa-paper-plane" style="color:blueviolet;font-size:18px;" aria-hidden="true"></i></button>
+                                                    </div>
+                                                    <input autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ng-model="newMessage" type="text" name="content" class="form-control" placeholder="Thêm bình luận">  
+                                  </div>
+                            </div>
+</div>
